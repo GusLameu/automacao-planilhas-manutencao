@@ -8,6 +8,8 @@
 - Cabeçalhos devem ser idênticos e estar na mesma ordem nas duas abas.
 - Abas sem registros e linhas totalmente vazias são ignoradas.
 - Não é adicionada coluna de origem.
+- Para cada linha importada de `Concluídos`, a coluna B recebe o valor original da coluna J, a coluna J é limpa e a coluna N recebe `_copia_`. Essa transformação ocorre apenas na cópia enviada ao Google Sheets; o arquivo Excel original não é alterado.
+- Os registros de `Pendentes` são enviados sem essa transformação.
 
 O monitoramento usa consulta periódica a cada 5 segundos, pois eventos de arquivos nem sempre são confiáveis em compartilhamentos SMB/UNC. O programa também faz uma sincronização inicial ao iniciar.
 

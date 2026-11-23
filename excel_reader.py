@@ -45,6 +45,12 @@ def read_and_combine_excel(file_path, source_sheet_names, logger):
                 vals = list(row[:COLUMN_COUNT])
                 if all(v is None or v == "" for v in vals):
                     continue
+                # A aba Concluídos recebe uma transformação apenas na cópia
+                # enviada ao Google Sheets: J -> B, limpar J e marcar N.
+                if name == "Concluídos":
+                    vals[1] = vals[9]  # Coluna B recebe o valor da coluna J.
+                    vals[9] = None     # Limpa a coluna J.
+                    vals[13] = "_copia_"  # Marca a linha na coluna N.
                 all_rows.append([normalize(v) for v in vals])
                 count += 1
             if count:
