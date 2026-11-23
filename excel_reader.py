@@ -6,9 +6,13 @@ FIRST_COLUMN = 1
 LAST_COLUMN = 14  # A:N
 COLUMN_COUNT = LAST_COLUMN - FIRST_COLUMN + 1
 
-def normalize(value):
+def normalize(value, column_index=None):
     if value is None:
         return ""
+    # Coluna B: somente dia/mês/ano.
+    if column_index in (1,9):
+        if isinstance(value, (datetime, date)):
+            return value.strftime("%Y-%m-%d")
     if isinstance(value, datetime):
         return value.isoformat(sep=" ")
     if isinstance(value, (date, datetime_time)):
@@ -19,46 +23,88 @@ def read_and_combine_excel(file_path, source_sheet_names, logger):
     file_path = Path(file_path)
     if file_path.suffix.lower() not in {".xlsx", ".xlsm"}:
         raise ValueError("O arquivo de origem deve ser .xlsx ou .xlsm.")
-    wb = load_workbook(file_path, read_only=True, data_only=True, keep_vba=file_path.suffix.lower()==".xlsm")
+
+    wb = load_workbook(
+        file_path,
+        read_only=True,
+        data_only=True,
+        keep_vba=file_path.suffix.lower() == ".xlsm"
+    )
+
     try:
         missing = [s for s in source_sheet_names if s not in wb.sheetnames]
         if missing:
             raise ValueError(f"Abas não encontradas no Excel: {missing}")
-        all_rows, expected_headers, used, skipped = [], None, [], []
+        all_rows = []
+        expected_headers = None
+        used = []
+        skipped = []
         for name in source_sheet_names:
             ws = wb[name]
-            it = ws.iter_rows(min_col=FIRST_COLUMN, max_col=LAST_COLUMN, values_only=True)
+            it = ws.iter_rows(
+                min_col=FIRST_COLUMN,
+                max_col=LAST_COLUMN,
+                values_only=True
+            )
             first = next(it, None)
             if first is None or all(v is None or v == "" for v in first):
-                skipped.append(name); logger.info("Aba '%s' vazia: ignorada.", name); continue
-            headers = [str(v).strip() if v is not None else "" for v in first]
+                skipped.append(name)
+                logger.info("Aba '%s' vazia: ignorada.", name)
+                continue
+            headers = [
+                str(v).strip() if v is not None else ""
+                for v in first
+            ]
             if len(headers) != COLUMN_COUNT or any(not h for h in headers):
-                raise ValueError(f"A aba '{name}' precisa ter cabeçalhos preenchidos em todas as colunas A:N.")
+                raise ValueError(
+                    f"A aba '{name}' precisa ter cabeçalhos preenchidos "
+                    "em todas as colunas A:N."
+                )
             if len(set(headers)) != len(headers):
-                raise ValueError(f"A aba '{name}' possui cabeçalhos duplicados em A:N.")
+                raise ValueError(
+                    f"A aba '{name}' possui cabeçalhos duplicados em A:N."
+                )
             if expected_headers is None:
                 expected_headers = headers
             elif headers != expected_headers:
-                raise ValueError(f"Os cabeçalhos da aba '{name}' diferem dos cabeçalhos da primeira aba. Verifique nomes e ordem em A:N.")
+                raise ValueError(
+                    f"Os cabeçalhos da aba '{name}' diferem dos cabeçalhos "
+                    "da primeira aba. Verifique nomes e ordem em A:N."
+                )
             count = 0
             for row in it:
                 vals = list(row[:COLUMN_COUNT])
                 if all(v is None or v == "" for v in vals):
                     continue
-                # A aba Concluídos recebe uma transformação apenas na cópia
-                # enviada ao Google Sheets: J -> B, limpar J e marcar N.
-                if name == "Concluídos":
-                    vals[1] = vals[9]  # Coluna B recebe o valor da coluna J.
-                    vals[9] = None     # Limpa a coluna J.
-                    vals[13] = "_copia_"  # Marca a linha na coluna N.
-                all_rows.append([normalize(v) for v in vals])
+                all_rows.append([normalize(v, i) for i, v in enumerate(vals)])
                 count += 1
+                # Gera uma cópia apenas para demandas concluídas.
+                if name == "Concluídos":
+                    copia = vals.copy()
+                    # Coluna J (índice 9) -> Coluna B (índice 1).
+                    copia[1] = copia[9]
+                    # Limpa a coluna J.
+                    copia[9] = None
+                    # Identifica a cópia na coluna N.
+                    copia[13] = "_copia_"
+                    all_rows.append([normalize(v, i) for i, v in enumerate(copia)])
             if count:
-                used.append(name); logger.info("Aba '%s': %d registro(s) lido(s) em A:N.", name, count)
+                used.append(name)
+                logger.info(
+                    "Aba '%s': %d registro(s) lido(s) em A:N.",
+                    name,
+                    count
+                )
             else:
-                skipped.append(name); logger.info("Aba '%s' sem registros: ignorada.", name)
+                skipped.append(name)
+                logger.info("Aba '%s' sem registros: ignorada.", name)
+
         if not all_rows:
-            raise ValueError("Nenhum registro encontrado nas abas configuradas. O destino NÃO será apagado.")
+            raise ValueError(
+                "Nenhum registro encontrado nas abas configuradas. "
+                "O destino NÃO será apagado."
+            )
+
         return [expected_headers] + all_rows, used, skipped
     finally:
         wb.close()

@@ -14,5 +14,6 @@ def replace_worksheet_values(credentials_path, spreadsheet_id, worksheet_name, v
     rows = len(values)
     cols = max(len(row) for row in values)
     worksheet.clear()
-    worksheet.update(range_name="A1", values=values, value_input_option="RAW")
+    worksheet.update(range_name="A1", values=values, value_input_option="USER_ENTERED")
+    worksheet.format(["B:B", "J:J"], {"numberFormat": {"type": "DATE", "pattern": "dd/MM/yyyy"}})
     logger.info("Destino '%s' atualizado com %d linhas e %d colunas.", worksheet_name, rows, cols)
