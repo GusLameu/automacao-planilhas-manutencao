@@ -1,6 +1,7 @@
 .env
 credentials/*.json
 logs/*.log
+planilha_medidores.xlsx
 __pycache__/
 *.pyc
 .venv/
