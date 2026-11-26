@@ -1,4 +1,4 @@
-# Excel Sync
+# Excel Sync v11
 
 **Sincronização automática de dados de um arquivo Excel para o Google Sheets utilizando Python.**
 
@@ -14,6 +14,9 @@ O projeto foi desenvolvido para reduzir atividades manuais, padronizar os dados 
 
 ## 2. Funcionalidades
 
+- Menu inicial com dois fluxos: **Planilha de Manutenção** e **Planilha Medidores**.
+- **Planilha de Manutenção:** exportação da planilha Excel local para o Google Sheets.
+- **Planilha Medidores:** importação de 3 planilhas Google Sheets para uma única planilha Excel local.
 - Monitoramento periódico de um arquivo Excel armazenado em rede.
 - Identificação de alterações no arquivo de origem.
 - Espera pela estabilização do arquivo antes da leitura.
@@ -27,6 +30,27 @@ O projeto foi desenvolvido para reduzir atividades manuais, padronizar os dados 
 - Substituição integral dos dados existentes na aba de destino.
 - Preservação da formatação visual da planilha de destino, quando não sobrescrita por outras operações.
 - Registro das operações e ocorrências em arquivos de log.
+
+### 2.1. Menu inicial
+
+Ao executar `python main.py`, o programa abre uma janela com duas opções:
+
+| Opção | Fluxo |
+|---|---|
+| **Planilha de Manutenção** | Exporta a planilha Excel local para o Google Sheets. |
+| **Planilha Medidores** | Importa 3 planilhas Google Sheets diferentes para uma única planilha Excel local. |
+
+Cada opção abre seu próprio painel, com botões de execução manual, monitoramento contínuo, parada, status e histórico de logs. Os dois fluxos podem ser monitorados ao mesmo tempo, pois usam serviços e buffers de log independentes.
+
+### 2.2. Planilha de Manutenção
+
+Mantém o comportamento original do projeto: lê as abas configuradas em `SOURCE_SHEETS`, combina os registros, gera as cópias da aba `Concluídos` e substitui o conteúdo da aba de destino no Google Sheets.
+
+### 2.3. Planilha Medidores
+
+Lê as 3 origens configuradas em `MEDIDORES_SOURCE_1_ID`, `MEDIDORES_SOURCE_2_ID` e `MEDIDORES_SOURCE_3_ID`, valida se todas possuem os mesmos cabeçalhos, empilha os registros em uma única tabela e substitui o conteúdo da aba de destino no arquivo Excel local indicado por `MEDIDORES_EXCEL_FILE`.
+
+As origens podem ser informadas pelo ID ou pela URL completa da planilha. Números e datas são preservados como números e datas no Excel. Se o arquivo de destino não existir, ele é criado automaticamente. As demais abas do arquivo são preservadas.
 
 ## 3. Tecnologias utilizadas
 
@@ -62,7 +86,9 @@ excel_sync/
 ├── monitor.py
 ├── excel_reader.py
 ├── google_sheets.py
+├── medidores.py
 ├── processor.py
+├── sync_panel.py
 ├── logger.py
 │
 ├── .env
@@ -84,12 +110,14 @@ excel_sync/
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `main.py` | Ponto de entrada da aplicação. Inicializa as configurações, o logger e o monitoramento. |
-| `config.py` | Carrega as variáveis de ambiente e valida as configurações necessárias. |
+| `main.py` | Ponto de entrada da aplicação. Abre o painel com o menu de fluxos ou executa em modo console. |
+| `config.py` | Carrega as variáveis de ambiente e valida as configurações dos dois fluxos. |
 | `monitor.py` | Monitora o arquivo Excel e identifica alterações para iniciar uma sincronização. |
 | `excel_reader.py` | Realiza a leitura, validação, combinação e transformação dos dados das abas do Excel. |
 | `google_sheets.py` | Gerencia a conexão com o Google Sheets e a substituição dos dados na planilha de destino. |
+| `medidores.py` | Lê as 3 origens do Google Sheets, valida cabeçalhos, empilha os registros e grava a planilha Excel local. |
 | `processor.py` | Coordena o processo de sincronização entre a leitura do Excel e o envio ao Google Sheets. |
+| `sync_panel.py` | Painel local com o menu Planilha de Manutenção / Planilha Medidores, status e logs. |
 | `logger.py` | Configura os registros de execução e os arquivos de log. |
 | `.env` | Armazena as configurações específicas do ambiente. |
 | `.env.example` | Apresenta um modelo das variáveis de configuração. |
@@ -202,6 +230,7 @@ As configurações são armazenadas no arquivo `.env`, localizado na raiz do pro
 Crie o arquivo a partir do modelo `.env.example` ou configure manualmente:
 
 ```env
+# Planilha de Manutenção (Excel local -> Google Sheets)
 EXCEL_FILE=localdaplanilha\nome_planilha.xlsx
 
 SOURCE_SHEETS=Pendentes,Concluídos
@@ -219,6 +248,25 @@ DEBOUNCE_SECONDS=3
 STABILITY_TIMEOUT_SECONDS=120
 
 STABILITY_INTERVAL_SECONDS=1
+
+# Planilha Medidores (3 Google Sheets -> Excel local)
+MEDIDORES_EXCEL_FILE=planilha_medidores.xlsx
+
+MEDIDORES_WORKSHEET_NAME=Medidores
+
+MEDIDORES_IMPORT_INTERVAL_SECONDS=60
+
+MEDIDORES_SOURCE_1_LABEL=Medidores A
+MEDIDORES_SOURCE_1_ID=id_ou_url_da_planilha_1
+MEDIDORES_SOURCE_1_SHEET=
+
+MEDIDORES_SOURCE_2_LABEL=Medidores B
+MEDIDORES_SOURCE_2_ID=id_ou_url_da_planilha_2
+MEDIDORES_SOURCE_2_SHEET=
+
+MEDIDORES_SOURCE_3_LABEL=Medidores C
+MEDIDORES_SOURCE_3_ID=id_ou_url_da_planilha_3
+MEDIDORES_SOURCE_3_SHEET=
 ```
 
 ### Descrição das variáveis
@@ -234,6 +282,14 @@ STABILITY_INTERVAL_SECONDS=1
 | `DEBOUNCE_SECONDS` | Tempo de espera para evitar múltiplas sincronizações decorrentes de alterações consecutivas. |
 | `STABILITY_TIMEOUT_SECONDS` | Tempo máximo de espera pela estabilização do arquivo. |
 | `STABILITY_INTERVAL_SECONDS` | Intervalo entre as verificações de estabilidade. |
+| `MEDIDORES_EXCEL_FILE` | Arquivo Excel local que receberá os dados dos medidores. Se não existir, é criado. |
+| `MEDIDORES_WORKSHEET_NAME` | Aba do Excel local que será substituída. Padrão: `Medidores`. |
+| `MEDIDORES_IMPORT_INTERVAL_SECONDS` | Intervalo entre as importações automáticas das 3 origens. |
+| `MEDIDORES_SOURCE_n_ID` | ID ou URL completa do Google Sheets da origem `n` (1 a 3). |
+| `MEDIDORES_SOURCE_n_SHEET` | Aba da origem `n`. Se vazio, usa a primeira aba da planilha. |
+| `MEDIDORES_SOURCE_n_LABEL` | Nome amigável da origem `n`, usado nos logs. |
+
+Após alterar o `.env`, reinicie o programa para que as novas configurações sejam carregadas.
 
 ### Identificando o ID da planilha
 
@@ -243,7 +299,7 @@ O ID é encontrado na URL do Google Sheets:
 https://docs.google.com/spreadsheets/d/ID_DA_PLANILHA/edit
 ```
 
-O valor entre `/d/` e `/edit` corresponde ao `GOOGLE_SPREADSHEET_ID`.
+O valor entre `/d/` e `/edit` corresponde ao `GOOGLE_SPREADSHEET_ID`. Para as origens de medidores, o campo aceita tanto o ID puro quanto a URL completa.
 
 **Atenção:** o caminho do arquivo Excel precisa estar acessível pelo usuário que executa a aplicação. Caso seja utilizado um diretório de rede mapeado, como `Z:`, a unidade deverá estar disponível durante a execução.
 
@@ -345,6 +401,22 @@ worksheet.format(
 ```
 
 A substituição é integral: os registros anteriores são removidos e substituídos pelos dados da execução atual.
+
+### Fluxo da Planilha Medidores
+
+O fluxo de importação dos medidores é independente do fluxo de manutenção:
+
+1. O módulo `medidores.py` autentica a conta de serviço e abre as 3 planilhas configuradas.
+2. Cada origem é lida com valores formatados e não formatados, permitindo preservar números e datas.
+3. A primeira linha de cada origem é tratada como cabeçalho.
+4. Os cabeçalhos das 3 origens precisam ser iguais, na mesma ordem, sem colunas vazias e sem duplicidades.
+5. Os registros são empilhados em uma única tabela.
+6. O conteúdo anterior da aba `MEDIDORES_WORKSHEET_NAME` é substituído no arquivo `MEDIDORES_EXCEL_FILE`.
+7. As demais abas do arquivo Excel são preservadas.
+
+Antes de gravar, a aplicação calcula uma assinatura dos dados. No modo automático, se nada mudou desde a última importação, o arquivo local não é reescrito. Isso evita conflitos com o Excel aberto e gravações desnecessárias.
+
+Se o arquivo de destino estiver aberto no Excel no momento da gravação, a importação falha com uma mensagem solicitando o fechamento do arquivo. A gravação é feita primeiro em um arquivo temporário, reduzindo o risco de corromper o destino.
 
 ## 10. Regras de transformação dos dados
 
@@ -483,13 +555,27 @@ Com o ambiente virtual ativado e as configurações preenchidas, execute:
 python main.py
 ```
 
-A aplicação iniciará o monitoramento do arquivo Excel.
+O painel abre no menu inicial. Escolha **Planilha de Manutenção** ou **Planilha Medidores**.
 
-A primeira sincronização é realizada durante a inicialização do monitoramento, conforme o fluxo implementado.
+Em cada painel:
 
-Depois disso, novas sincronizações ocorrerão quando alterações forem identificadas.
+| Botão | Planilha de Manutenção | Planilha Medidores |
+|---|---|---|
+| Executar | Sincronizar agora | Importar agora |
+| Monitorar | Manter sincronia | Importar automaticamente |
+| Parar | Encerra o monitoramento | Encerra o monitoramento |
 
-Para interromper a aplicação, utilize:
+Para executar sem a janela:
+
+```bash
+# Planilha de Manutenção, monitorando alterações no Excel
+python main.py --console
+
+# Planilha Medidores, importando as 3 origens periodicamente
+python main.py --console --medidores
+```
+
+Para interromper a execução em modo console, utilize:
 
 ```text
 Ctrl + C
@@ -605,6 +691,18 @@ Por isso, uma falha de conexão ocorrida entre a limpeza e a gravação poderá 
 
 É recomendável manter uma cópia de segurança da planilha de destino e considerar mecanismos adicionais de recuperação caso o projeto passe a ser utilizado em produção.
 
+### 14.10. Planilha de destino dos medidores aberta no Excel
+
+Se o arquivo `MEDIDORES_EXCEL_FILE` estiver aberto no Excel no momento da importação, o Windows pode impedir a substituição do arquivo. A aplicação exibe uma mensagem solicitando o fechamento do arquivo. Feche-o e tente novamente.
+
+### 14.11. Cabeçalhos diferentes nas origens de medidores
+
+As 3 origens precisam ter os mesmos cabeçalhos, na mesma ordem, sem colunas vazias e sem nomes duplicados. Quando houver diferença, a importação é interrompida antes de alterar o arquivo local, e o log mostra os cabeçalhos esperados e os encontrados.
+
+### 14.12. Origens de medidores não configuradas
+
+Se `MEDIDORES_SOURCE_1_ID`, `MEDIDORES_SOURCE_2_ID` ou `MEDIDORES_SOURCE_3_ID` estiverem vazios, o painel mostra **Configuração pendente** e não permite iniciar a importação. Preencha os IDs ou URLs no `.env` e reinicie o programa.
+
 ## 15. Segurança
 
 Algumas práticas importantes:
@@ -638,14 +736,14 @@ Algumas melhorias que podem ser consideradas para evoluir o projeto:
 - Implementar atualização transacional ou estratégia de recuperação para evitar que o destino fique vazio em caso de falha.
 - Adicionar notificações de erro e sucesso.
 - Implementar execução automática do programa junto à inicialização do Windows.
-- Criar uma interface para acompanhamento do status da sincronização.
+- Adicionar uma tela de configuração das origens dentro do painel, sem editar o `.env`.
 - Adicionar testes automatizados para as regras de transformação.
 - Implementar validações adicionais de integridade dos dados.
 - Avaliar a utilização de sincronização incremental para arquivos maiores.
 
 ## 17. Considerações finais
 
-O Excel Sync automatiza o processo de consolidação e disponibilização de informações de manutenção, integrando uma fonte de dados Excel a uma estrutura centralizada no Google Sheets.
+O Excel Sync automatiza o processo de consolidação e disponibilização de informações de manutenção, integrando uma fonte de dados Excel a uma estrutura centralizada no Google Sheets. O mesmo painel também concentra o fluxo de medidores, importando 3 planilhas Google Sheets para uma única planilha Excel local.
 
 A aplicação elimina a necessidade de transferências manuais recorrentes, padroniza os registros e prepara os dados para utilização em relatórios e indicadores desenvolvidos no Looker Studio.
 
