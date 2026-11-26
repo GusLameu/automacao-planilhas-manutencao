@@ -3,9 +3,15 @@ from google.oauth2.service_account import Credentials
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
-def replace_worksheet_values(credentials_path, spreadsheet_id, worksheet_name, values, logger):
+
+def open_client(credentials_path):
+    """Autentica a conta de serviço e devolve um cliente gspread."""
     creds = Credentials.from_service_account_file(str(credentials_path), scopes=SCOPES)
-    client = gspread.authorize(creds)
+    return gspread.authorize(creds)
+
+
+def replace_worksheet_values(credentials_path, spreadsheet_id, worksheet_name, values, logger):
+    client = open_client(credentials_path)
     spreadsheet = client.open_by_key(spreadsheet_id)
     try:
         worksheet = spreadsheet.worksheet(worksheet_name)
